@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Local y Mapa de Clases</title>
+    <script src="https://cdn.jsdelivr.net/npm/alasql@1.7.2/dist/alasql.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.0/dist/vis-network.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #sql-input { width: 100%; height: 150px; margin-bottom: 10px; font-family: monospace; }
+        #result { margin-top: 20px; padding: 10px; background-color: #f5f5f5; border: 1px solid #ddd; white-space: pre-wrap; }
+        #network { width: 100%; height: 400px; border: 1px solid #ccc; margin-top: 20px; }
+        button { padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer; margin-right: 10px; }
+        button:hover { background-color: #45a049; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close:hover { color: black; cursor: pointer; }
+        .column-input { margin-bottom: 10px; padding: 10px; border: 1px solid #ddd; }
+        .column-input input, .column-input select { margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>SQL Local y Mapa de Clases</h1>
+    <div id="buttons-container">
+        <button onclick="openCreateTableModal()">Crear Tabla</button>
+        <button onclick="editTable()">Editar Tabla</button>
+        <button onclick="deleteTable()">Borrar Tabla</button>
+        <button onclick="futureFunction1()">Función 1</button>
+        <button onclick="futureFunction2()">Función 2</button>
+        <button onclick="futureFunction3()">Función 3</button>
+        <button onclick="futureFunction4()">Función 4</button>
+        <button onclick="futureFunction5()">Función 5</button>
+        <button onclick="futureFunction6()">Función 6</button>
+        <button onclick="futureFunction7()">Función 7</button>
+        <button onclick="downloadSQL()">Descargar SQL</button>
+    </div>
+    <textarea id="sql-input" placeholder="Escribe tu consulta SQL aquí (ej. INSERT, SELECT...)"></textarea>
+    <button onclick="executeSQL()">Ejecutar SQL</button>
+    <div id="result"></div>
+    <h2>Mapa de Clases</h2>
+    <div id="network"></div>
+
+    <!-- Modal para crear tabla -->
+    <div id="createTableModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeCreateTableModal()">×</span>
+            <h2>Crear Nueva Tabla</h2>
+            <label for="tableName">Nombre de la tabla:</label>
+            <input type="text" id="tableName" placeholder="ej. estudiantes"><br><br>
+            <h3>Elementos (Columnas)</h3>
+            <div id="columnsContainer"></div>
+            <button onclick="addColumnInput()">Añadir Elemento</button><br><br>
+            <button onclick="createTableFromForm()">Crear Tabla</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="scripts/main.js"></script>
+    <script src="scripts/createTable.js"></script>
+    <script src="scripts/editTable.js"></script>
+    <script src="scripts/deleteTable.js"></script>
+</body>
+</html>
