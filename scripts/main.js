@@ -3,7 +3,10 @@ const schema = {
     tables: {} // { nombreTabla: { columns: [], data: [] } }
 };
 
+const relationships = []; // { name: string, table1: string, table2: string, type: string, direction: string }
+
 // Inicializar el mapa de clases
+// Parte gráfica y visual de las tablas en SQL (no es necesario entenderlo)
 const container = document.getElementById('network');
 const nodes = new vis.DataSet([]);
 const edges = new vis.DataSet([]);
@@ -15,20 +18,48 @@ const options = {
 const network = new vis.Network(container, data, options);
 
 // Actualizar el mapa de clases
+// Parte gráfica y visual de las tablas en SQL (no es necesario entenderlo)
 function updateClassMap() {
-    nodes.clear();
-    edges.clear();
+    nodes.clear(); // Borramos todos los nodos (tablas)
+    edges.clear(); // Borramos todas las aristas (conexiones)
     for (const tableName in schema.tables) {
         const table = schema.tables[tableName];
-        const columns = table.columns.map(col => {
-            let colStr = `${col.name} ${col.type}`;
-            if (col.size) colStr += `(${col.size})`;
-            if (col.pk) colStr += ' PK';
-            if (col.check) colStr += ` CHECK(${col.check})`;
-            return colStr;
-        }).join('\n');
-        nodes.add({ id: tableName, label: `${tableName}\n${columns}` });
+        if (table.isEnum) {
+            const values = table.values.join(', ');
+            nodes.add({ id: tableName, label: `${tableName}\n${values}` });
+        } else {
+            const columns = table.columns.map(col => {
+                let colStr = `${col.name} ${col.type}`;
+                if (col.size) colStr += `(${col.size})`;
+                if (col.pk) colStr += ' PK';
+                if (col.check) colStr += ` CHECK(${col.check})`;
+                return colStr;
+            }).join('\n');
+            nodes.add({ id: tableName, label: `${tableName}\n${columns}` });
+        }
     }
+    relationships.forEach(rel => {
+        let arrow;
+        switch(rel.direction) {
+            case 'bidirectional':
+                arrow = ''; // Sin flechas para bidireccional
+                break;
+            case 'forward':
+                arrow = 'to';
+                break;
+            case 'backward':
+                arrow = 'from';
+                break;
+        }
+        edges.add({
+            from: rel.table1,
+            to: rel.table2,
+            label: `${rel.name} (${rel.type})`,
+            arrows: arrow
+        });
+    });
+    populateTableDropdown();
+    populateEnumDropdown();
 }
 
 // Ejecutar consultas SQL manuales
@@ -36,6 +67,26 @@ function executeSQL() {
     const query = document.getElementById('sql-input').value.trim();
     const resultDiv = document.getElementById('result');
     try {
+        const insertMatch = query.match(/INSERT INTO (\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
+        if (insertMatch) {
+            const tableName = insertMatch[1];
+            const columns = insertMatch[2].split(',').map(col => col.trim());
+            const values = insertMatch[3].split(',').map(val => val.trim().replace(/['"]/g, ''));
+
+            if (schema.tables[tableName]) {
+                const table = schema.tables[tableName];
+                for (let i = 0; i < columns.length; i++) {
+                    const column = table.columns.find(col => col.name === columns[i]);
+                    if (column && schema.tables[column.type]?.isEnum) {
+                        const enumValues = schema.tables[column.type].values;
+                        if (!enumValues.includes(values[i])) {
+                            throw new Error(`El valor "${values[i]}" no es válido para el enum "${column.type}". Valores válidos: ${enumValues.join(', ')}`);
+                        }
+                    }
+                }
+            }
+        }
+
         const res = alasql(query);
         resultDiv.innerText = JSON.stringify(res, null, 2);
         updateClassMap();
@@ -45,19 +96,44 @@ function executeSQL() {
 }
 
 // Descargar el SQL generado
+// Generar archivo .sql con el esquema de la base de datos
 function downloadSQL() {
     let sqlContent = '';
+    
+    // Primero los ENUMs
     for (const tableName in schema.tables) {
         const table = schema.tables[tableName];
-        const columns = table.columns.map(col => {
-            let colDef = `${col.name} ${col.type}`;
-            if (col.size) colDef += `(${col.size})`;
-            if (col.pk) colDef += ' PRIMARY KEY';
-            if (col.check) colDef += ` CHECK(${col.check})`;
-            return colDef;
-        }).join(', ');
-        sqlContent += `CREATE TABLE ${tableName} (${columns});\n`;
+        if (table.isEnum) {
+            sqlContent += `-- ENUM: ${tableName}\n`;
+            sqlContent += `CREATE TYPE ${tableName} AS ENUM (${table.values.map(v => `'${v}'`).join(', ')});\n\n`;
+        }
     }
+
+    // Luego las tablas
+    for (const tableName in schema.tables) {
+        const table = schema.tables[tableName];
+        if (!table.isEnum) {
+            sqlContent += `-- TABLE: ${tableName}\n`;
+            const columns = table.columns.map(col => {
+                let colDef = `${col.name} ${col.type}`;
+                if (col.pk) colDef += ' PRIMARY KEY';
+                if (schema.tables[col.type]?.isEnum) {
+                    colDef += ` CHECK(${col.name} IN (${schema.tables[col.type].values.map(v => `'${v}'`).join(', ')}))`;
+                }
+                return colDef;
+            }).join(',\n  ');
+            sqlContent += `CREATE TABLE ${tableName} (\n  ${columns}\n);\n\n`;
+        }
+    }
+
+    // Finalmente las relaciones
+    if (relationships.length > 0) {
+        sqlContent += '-- RELATIONSHIPS\n';
+        relationships.forEach(rel => {
+            sqlContent += `-- ${rel.name}: ${rel.table1} ${rel.type} ${rel.table2} (${rel.direction})\n`;
+        });
+    }
+
     const blob = new Blob([sqlContent], { type: 'text/sql' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -66,3 +142,208 @@ function downloadSQL() {
     a.click();
     URL.revokeObjectURL(url);
 }
+
+function loadSQL(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const content = e.target.result;
+            
+            // Limpiar estado actual
+            schema.tables = {};
+            relationships.length = 0;
+
+            // Separar el contenido en bloques
+            const blocks = content.split('\n\n').filter(block => block.trim());
+            
+            // Primer paso: procesar solo los ENUMs
+            blocks.forEach(block => {
+                if (block.includes('CREATE TYPE') && block.includes('AS ENUM')) {
+                    processEnum(block);
+                }
+            });
+
+            // Segundo paso: procesar las tablas
+            blocks.forEach(block => {
+                if (block.includes('CREATE TABLE')) {
+                    processTable(block);
+                }
+            });
+
+            // Tercer paso: procesar las relaciones
+            blocks.forEach(block => {
+                if (block.includes('-- RELATIONSHIPS')) {
+                    const lines = block.split('\n');
+                    lines.forEach(line => {
+                        if (line.startsWith('-- ') && !line.startsWith('-- RELATIONSHIPS')) {
+                            const match = line.match(/-- (.*): (.*) (.*) (.*) \((.*)\)/);
+                            if (match) {
+                                relationships.push({
+                                    name: match[1],
+                                    table1: match[2],
+                                    type: match[3],
+                                    table2: match[4],
+                                    direction: match[5]
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+
+            // Actualizar la interfaz
+            updateClassMap();
+            populateTableDropdown();
+            populateEnumDropdown();
+            
+            alert('SQL cargado exitosamente');
+            event.target.value = '';
+            
+        } catch (error) {
+            alert('Error al cargar el archivo: ' + error.message);
+            console.error(error);
+        }
+    };
+
+    reader.readAsText(file);
+}
+
+function processEnum(sql) {
+    const match = sql.match(/CREATE TYPE (\w+) AS ENUM \((.*)\)/i);
+    if (match) {
+        const enumName = match[1];
+        // Procesar valores manteniendo las comitas y separando correctamente
+        const valuesString = match[2];
+        const values = valuesString.split(',')
+            .map(v => v.trim().replace(/^'|'$/g, ''))
+            .filter(v => v);
+
+        if (values.length > 0) {
+            schema.tables[enumName] = {
+                isEnum: true,
+                values: values
+            };
+        }
+    }
+}
+
+function processTable(sql) {
+    const match = sql.match(/CREATE TABLE (\w+)\s*\(([\s\S]+)\)/i);
+    if (match) {
+        const tableName = match[1];
+        let columnsPart = match[2];
+        
+        // Eliminar todos los CHECKs para no interferir con el parsing
+        columnsPart = columnsPart.replace(/CHECK\s*\([^)]+\)/gi, '');
+        
+        // Dividir las columnas y limpiar
+        const columnDefs = columnsPart.split(',')
+            .map(col => col.trim())
+            .filter(col => col);
+
+        const columns = columnDefs.map(def => {
+            // Separar solo el nombre y el tipo, ignorando el resto
+            const parts = def.split(' ');
+            return {
+                name: parts[0],
+                type: parts[1],
+                pk: def.toLowerCase().includes('primary key')
+            };
+        });
+
+        if (columns.length > 0) {
+            schema.tables[tableName] = {
+                columns: columns,
+                data: []
+            };
+        }
+    }
+}
+
+function processRelationship(line) {
+    const match = line.match(/-- (.*): (.*) (.*) (.*) \((.*)\)/);
+    if (match) {
+        relationships.push({
+            name: match[1],
+            table1: match[2],
+            type: match[3],
+            table2: match[4],
+            direction: match[5]
+        });
+    }
+}
+
+function populateTableDropdown() {
+    const tableDropdown = document.getElementById('tableDropdown');
+    tableDropdown.innerHTML = '';
+    for (const tableName in schema.tables) {
+        const table = schema.tables[tableName];
+        if (!table.isEnum) { // Exclude enums
+            const option = document.createElement('option');
+            option.value = tableName;
+            option.text = tableName;
+            tableDropdown.appendChild(option);
+        }
+    }
+}
+
+function populateEnumDropdown() {
+    const enumDropdown = document.getElementById('enumDropdown');
+    enumDropdown.innerHTML = '';
+    for (const tableName in schema.tables) {
+        const table = schema.tables[tableName];
+        if (table.isEnum) { // Include only enums
+            const option = document.createElement('option');
+            option.value = tableName;
+            option.text = tableName;
+            enumDropdown.appendChild(option);
+        }
+    }
+}
+
+function openRelationshipModal() {
+    const tableDropdown1 = document.getElementById('relationshipTable1');
+    const tableDropdown2 = document.getElementById('relationshipTable2');
+    tableDropdown1.innerHTML = '';
+    tableDropdown2.innerHTML = '';
+
+    for (const tableName in schema.tables) {
+        const option1 = document.createElement('option');
+        const option2 = document.createElement('option');
+        option1.value = tableName;
+        option1.text = tableName;
+        option2.value = tableName;
+        option2.text = tableName;
+        tableDropdown1.appendChild(option1);
+        tableDropdown2.appendChild(option2);
+    }
+
+    document.getElementById('relationshipModal').style.display = 'block';
+}
+
+function closeRelationshipModal() {
+    document.getElementById('relationshipModal').style.display = 'none';
+}
+
+function saveRelationship() {
+    const name = document.getElementById('relationshipName').value.trim();
+    const table1 = document.getElementById('relationshipTable1').value;
+    const table2 = document.getElementById('relationshipTable2').value;
+    const type = document.getElementById('relationshipType').value;
+    const direction = document.getElementById('relationshipDirection').value;
+
+    if (!name || !table1 || !table2 || !type || !direction) {
+        alert('Por favor, completa todos los campos.');
+        return;
+    }
+
+    relationships.push({ name, table1, table2, type, direction });
+    updateClassMap();
+    closeRelationshipModal();
+    alert(`Relación "${name}" creada exitosamente.`);
+}
+
+populateEnumDropdown();

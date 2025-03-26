@@ -21,12 +21,21 @@ function addColumnInput() {
             <option value="STRING">STRING</option>
             <option value="FLOAT">FLOAT</option>
             <option value="BOOLEAN">BOOLEAN</option>
+            <option value="DATE">DATE</option>
+            ${Object.keys(schema.tables)
+                .filter(tableName => schema.tables[tableName].isEnum)
+                .map(enumName => `<option value="${enumName}">${enumName}</option>`)
+                .join('')}
         </select>
-        <input type="text" placeholder="Tamaño (opcional)" class="col-size">
         <label><input type="checkbox" class="col-pk"> Clave Primaria</label>
-        <input type="text" placeholder="CHECK (ej. > 0)" class="col-check">
+        <button onclick="removeColumnInput(this)">Eliminar</button>
     `;
     container.appendChild(newInput);
+}
+
+function removeColumnInput(button) {
+    const container = document.getElementById('columnsContainer');
+    container.removeChild(button.parentElement);
 }
 
 function createTableFromForm() {
@@ -41,16 +50,20 @@ function createTableFromForm() {
     columnInputs.forEach(input => {
         const name = input.querySelector('.col-name').value.trim();
         const type = input.querySelector('.col-type').value;
-        const size = input.querySelector('.col-size').value.trim();
         const pk = input.querySelector('.col-pk').checked;
-        const check = input.querySelector('.col-check').value.trim();
 
         if (name) {
             let colDef = `${name} ${type}`;
-            if (size) colDef += `(${size})`;
+            if (schema.tables[type]?.isEnum) {
+                const enumValues = schema.tables[type].values.map(val => `'${val}'`).join(', ');
+                colDef += ` CHECK(${name} IN (${enumValues}))`;
+            }
             if (pk) colDef += ' PRIMARY KEY';
-            if (check) colDef += ` CHECK(${check})`;
-            columns.push(colDef);
+            columns.push({
+                name,
+                type,
+                pk
+            });
         }
     });
 
@@ -59,20 +72,20 @@ function createTableFromForm() {
         return;
     }
 
-    const query = `CREATE TABLE ${tableName} (${columns.join(', ')})`;
+    const query = `CREATE TABLE ${tableName} (${columns.map(col => {
+        let colDef = `${col.name} ${col.type}`;
+        if (schema.tables[col.type]?.isEnum) {
+            const enumValues = schema.tables[col.type].values.map(val => `'${val}'`).join(', ');
+            colDef += ` CHECK(${col.name} IN (${enumValues}))`;
+        }
+        if (col.pk) colDef += ' PRIMARY KEY';
+        return colDef;
+    }).join(', ')})`;
+
     try {
         alasql(query);
         schema.tables[tableName] = {
-            columns: columns.map(col => {
-                const parts = col.split(' ');
-                return {
-                    name: parts[0],
-                    type: parts[1],
-                    size: col.includes('(') ? col.split('(')[1].split(')')[0] : null,
-                    pk: col.includes('PRIMARY KEY'),
-                    check: col.includes('CHECK') ? col.split('CHECK(')[1].slice(0, -1) : null
-                };
-            }),
+            columns,
             data: []
         };
         updateClassMap();
@@ -80,4 +93,36 @@ function createTableFromForm() {
     } catch (e) {
         alert('Error al crear la tabla: ' + e.message);
     }
+}
+
+function updateClassMap() {
+    nodes.clear();
+    edges.clear();
+
+    for (const tableName in schema.tables) {
+        const table = schema.tables[tableName];
+        if (table.isEnum) {
+            const values = table.values.join(', ');
+            nodes.add({ id: tableName, label: `${tableName}\n${values}` });
+        } else {
+            const columns = table.columns.map(col => {
+                let colStr = `${col.name} ${col.type}`;
+                if (col.size) colStr += `(${col.size})`;
+                if (col.pk) colStr += ' PK';
+                if (col.check) colStr += ` CHECK(${col.check})`;
+                return colStr;
+            }).join('\n');
+            nodes.add({ id: tableName, label: `${tableName}\n${columns}` });
+        }
+    }
+
+    relationships.forEach(rel => {
+        edges.add({
+            from: rel.table1,
+            to: rel.table2,
+            label: `${rel.name} (${rel.type})`
+        });
+    });
+
+    populateTableDropdown();
 }
