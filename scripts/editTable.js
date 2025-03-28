@@ -5,6 +5,24 @@ function openEditTableModal() {
         return;
     }
 
+    // Verificar si hay datos en la tabla
+    try {
+        const tableData = alasql(`SELECT * FROM ${tableName}`);
+        if (tableData.length > 0) {
+            const confirmation = confirm(
+                '⚠️ ADVERTENCIA ⚠️\n\n' +
+                'Esta tabla contiene datos insertados. La modificación o eliminación de elementos puede causar:\n\n' +
+                '- Pérdida de datos existentes\n' +
+                '- Inconsistencias en las relaciones\n' +
+                '- Errores en las consultas existentes\n\n' +
+                '¿Estás seguro de que deseas continuar con la edición?'
+            );
+            if (!confirmation) return;
+        }
+    } catch (error) {
+        console.error('Error al verificar datos de la tabla:', error);
+    }
+
     const table = schema.tables[tableName];
     const container = document.getElementById('editColumnsContainer');
     container.innerHTML = ''; // Reiniciar el contenedor
