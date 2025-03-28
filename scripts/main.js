@@ -155,25 +155,47 @@ function loadSQL(event) {
             // Limpiar estado actual
             schema.tables = {};
             relationships.length = 0;
+            
+            // Limpiar todas las tablas existentes en alasql
+            const tables = alasql('SHOW TABLES');
+            tables.forEach(table => {
+                try {
+                    alasql(`DROP TABLE IF EXISTS ${table.tableName}`);
+                } catch (e) {
+                    console.warn(`Error al borrar tabla ${table.tableName}:`, e);
+                }
+            });
 
             // Separar el contenido en bloques
             const blocks = content.split('\n\n').filter(block => block.trim());
             
-            // Primer paso: procesar solo los ENUMs
+            // Primer paso: procesar los ENUMs y crear los tipos
             blocks.forEach(block => {
                 if (block.includes('CREATE TYPE') && block.includes('AS ENUM')) {
                     processEnum(block);
+                    // También ejecutar la creación del enum en alasql
+                    try {
+                        alasql(block);
+                    } catch (e) {
+                        console.warn('Error al crear enum en alasql:', e);
+                    }
                 }
             });
 
-            // Segundo paso: procesar las tablas
+            // Segundo paso: procesar y crear las tablas
             blocks.forEach(block => {
                 if (block.includes('CREATE TABLE')) {
                     processTable(block);
+                    // También ejecutar la creación de la tabla en alasql
+                    try {
+                        alasql(block);
+                    } catch (e) {
+                        console.warn('Error al crear tabla en alasql:', e);
+                    }
                 }
             });
 
-            // Tercer paso: procesar las relaciones
+            // Procesar las relaciones
             blocks.forEach(block => {
                 if (block.includes('-- RELATIONSHIPS')) {
                     const lines = block.split('\n');
@@ -194,7 +216,6 @@ function loadSQL(event) {
                 }
             });
 
-            // Actualizar la interfaz
             updateClassMap();
             populateTableDropdown();
             populateEnumDropdown();

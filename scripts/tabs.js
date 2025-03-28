@@ -15,9 +15,11 @@ function showTab(tabName) {
     // Activar el botón correspondiente
     document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`).classList.add('active');
 
-    // Inicializar la pestaña de inserciones si es necesario
+    // Inicializar pestañas específicas
     if (tabName === 'inserciones') {
         setupInsertionsTab();
+    } else if (tabName === 'datos') {
+        setupDataTab();
     }
 }
 
