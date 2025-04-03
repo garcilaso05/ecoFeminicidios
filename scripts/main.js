@@ -5,21 +5,26 @@ const schema = {
 
 const relationships = []; // { name: string, table1: string, table2: string, type: string, direction: string }
 
-// Inicializar el mapa de clases
-// Parte gráfica y visual de las tablas en SQL (no es necesario entenderlo)
-const container = document.getElementById('network');
-const nodes = new vis.DataSet([]);
-const edges = new vis.DataSet([]);
-const data = { nodes: nodes, edges: edges };
-const options = { 
-    nodes: { shape: 'box', font: { size: 12 }, widthConstraint: { maximum: 200 } },
-    edges: { arrows: 'to' }
-};
-const network = new vis.Network(container, data, options);
+let nodes;
+let edges;
+let network;
+
+window.addEventListener("load", () => {
+    const container = document.getElementById('network');
+    nodes = new vis.DataSet([]);
+    edges = new vis.DataSet([]);
+    const data = { nodes: nodes, edges: edges };
+    const options = { 
+        nodes: { shape: 'box', font: { size: 12 }, widthConstraint: { maximum: 200 } },
+        edges: { arrows: 'to' }
+    };
+    network = new vis.Network(container, data, options);
+});
 
 // Actualizar el mapa de clases
 // Parte gráfica y visual de las tablas en SQL (no es necesario entenderlo)
 function updateClassMap() {
+    if (!nodes || !edges) return; // Asegura que estén inicializados
     nodes.clear(); // Borramos todos los nodos (tablas)
     edges.clear(); // Borramos todas las aristas (conexiones)
     for (const tableName in schema.tables) {
@@ -221,6 +226,7 @@ function loadSQL(event) {
             populateEnumDropdown();
             
             alert('SQL cargado exitosamente');
+            
             event.target.value = '';
             
         } catch (error) {
