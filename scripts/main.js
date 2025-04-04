@@ -9,6 +9,7 @@ let nodes;
 let edges;
 let network;
 
+
 window.addEventListener("load", () => {
     const container = document.getElementById('network');
     nodes = new vis.DataSet([]);
@@ -27,6 +28,38 @@ window.addEventListener("resize", () => {
     }
 });
 
+function cargarTablaOAVD() {
+    alasql(`
+      DROP TABLE IF EXISTS OAVD;
+      CREATE TABLE OAVD (ID INT, Ciudad STRING);
+      INSERT INTO OAVD VALUES 
+        (1, 'Barcelona'),
+        (2, 'Madrid'),
+        (3, 'Valencia'),
+        (4, 'Sevilla'),
+        (5, 'Zaragoza'),
+        (6, 'Málaga'),
+        (7, 'Granada'),
+        (8, 'Valladolid'),
+        (9, 'Oviedo'),
+        (10, 'Pamplona'),
+        (11, 'Bilbao'),
+        (12, 'San Sebastián'),
+        (13, 'Vitoria-Gasteiz'),
+        (14, 'Lleida'),
+        (15, 'Tarragona'),
+        (16, 'Murcia'),
+        (17, 'Cartagena'),
+        (18, 'Santa Cruz de Tenerife'),
+        (19, 'Las Palmas'),
+        (20, 'Ibiza'),
+        (21, 'Mallorca'),
+        (22, 'Menorca'),
+        (23, 'Ceuta'),
+        (24, 'Melilla');
+    `);
+  }
+  
 // Actualizar el mapa de clases
 // Parte gráfica y visual de las tablas en SQL (no es necesario entenderlo)
 function updateClassMap() {
@@ -380,3 +413,4 @@ function saveRelationship() {
 }
 
 populateEnumDropdown();
+cargarTablaOAVD();
