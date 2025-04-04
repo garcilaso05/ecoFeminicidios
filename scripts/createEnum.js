@@ -4,6 +4,10 @@ function openCreateEnumModal() {
     addEnumValueInputCreate(); // Cambiado para usar función específica
     document.getElementById('enumName').value = '';
     document.getElementById('createEnumModal').style.display = 'block';
+
+    // Hacer el contenedor desplazable
+    container.style.maxHeight = '300px';
+    container.style.overflowY = 'auto';
 }
 
 function closeCreateEnumModal() {

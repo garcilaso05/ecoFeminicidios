@@ -50,6 +50,10 @@ function openEditEnumModal() {
         container.appendChild(valueInput);
     });
 
+    // Hacer el contenedor desplazable
+    container.style.maxHeight = '300px';
+    container.style.overflowY = 'auto';
+
     document.getElementById('editEnumName').value = enumName;
     document.getElementById('editEnumModal').style.display = 'block';
 }

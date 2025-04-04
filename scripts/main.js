@@ -21,6 +21,12 @@ window.addEventListener("load", () => {
     network = new vis.Network(container, data, options);
 });
 
+window.addEventListener("resize", () => {
+    if (network) {
+        network.redraw(); // Adjust table map size dynamically
+    }
+});
+
 // Actualizar el mapa de clases
 // Parte gráfica y visual de las tablas en SQL (no es necesario entenderlo)
 function updateClassMap() {

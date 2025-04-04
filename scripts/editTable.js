@@ -37,12 +37,21 @@ function openEditTableModal() {
                 <option value="STRING" ${col.type === 'STRING' ? 'selected' : ''}>STRING</option>
                 <option value="FLOAT" ${col.type === 'FLOAT' ? 'selected' : ''}>FLOAT</option>
                 <option value="BOOLEAN" ${col.type === 'BOOLEAN' ? 'selected' : ''}>BOOLEAN</option>
+                <option value="DATE" ${col.type === 'DATE' ? 'selected' : ''}>DATE</option>
+                ${Object.keys(schema.tables)
+                    .filter(enumName => schema.tables[enumName].isEnum)
+                    .map(enumName => `<option value="${enumName}" ${col.type === enumName ? 'selected' : ''}>${enumName}</option>`)
+                    .join('')}
             </select>
             <label><input type="checkbox" class="col-pk" ${col.pk ? 'checked' : ''}> Clave Primaria</label>
             <button onclick="removeColumnInput(this)">Eliminar</button>
         `;
         container.appendChild(newInput);
     });
+
+    // Hacer el contenedor de columnas desplazable
+    container.style.maxHeight = '300px';
+    container.style.overflowY = 'auto';
 
     document.getElementById('editTableModal').style.display = 'block';
 }

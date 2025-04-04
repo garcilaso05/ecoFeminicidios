@@ -31,6 +31,10 @@ function addColumnInput() {
         <button onclick="removeColumnInput(this)">Eliminar</button>
     `;
     container.appendChild(newInput);
+
+    // Hacer el contenedor de columnas desplazable
+    container.style.maxHeight = '300px';
+    container.style.overflowY = 'auto';
 }
 
 function removeColumnInput(button) {
